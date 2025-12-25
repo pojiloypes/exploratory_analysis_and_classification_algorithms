@@ -1,0 +1,66 @@
+services:
+  abalone-app:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: abalone-app
+    environment:
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./data:/usr/src/app/data
+      - ./models:/usr/src/app/models
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - abalone-network
+    restart: on-failure
+
+  abalone-dashboard:
+    build: 
+      context: .
+      dockerfile: dashboard/dockerfile
+    container_name: abalone-dashboard
+    depends_on:
+      abalone-app:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./data:/usr/src/app/data
+      - ./models:/usr/src/app/models
+    expose:
+      - "9050"
+    networks:
+      - abalone-network
+    restart: on-failure
+
+  nginx:
+    image: nginx:alpine
+    container_name: abalone-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - abalone-network
+    restart: unless-stopped
+    depends_on:
+      - abalone-app
+      - abalone-dashboard
+
+networks:
+  abalone-network:
+    driver: bridge
+
+volumes:
+  abalone-data:
+    driver: local
+  abalone-models:
+    driver: local
